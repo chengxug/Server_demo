@@ -4,11 +4,20 @@
 #include <unistd.h>
 
 #include "ThreadPool.h"
+#include "spdlog/spdlog.h"
+#include "spdlog/sinks/basic_file_sink.h"
+
 class Server
 {
 public:
-    Server(int p) : port_(p), thread_pool_(4), server_fd_(-1) {}
-    Server(int p, size_t pool_size) : port_(p), thread_pool_(pool_size), server_fd_(-1) {}
+    Server(int p) : port_(p), thread_pool_(4), server_fd_(-1)
+    {
+        logger_ = spdlog::basic_logger_mt("basic_logger", "logs/server.log");
+    }
+    Server(int p, size_t pool_size) : port_(p), thread_pool_(pool_size), server_fd_(-1)
+    {
+        logger_ = spdlog::basic_logger_mt("basic_logger", "logs/server.log");
+    }
     ~Server() {}
 
     bool start();
@@ -20,6 +29,7 @@ private:
     int server_fd_;
     bool running_;
     std::thread accept_thread;
+    std::shared_ptr<spdlog::logger> logger_;
 
     bool setup_socket(); // 创建socket, 并设置socket
     void accept_connection();
@@ -31,13 +41,14 @@ bool Server::start()
 {
     if (!setup_socket())
     {
-        std::cerr << "Failed to setup socket" << std::endl;
+        logger_->error("Failed to setup socket");
         return false;
     }
 
     running_ = true;
     accept_thread = std::thread(&Server::accept_connection, this);
     std::cout << "Server started on port " << port_ << std::endl;
+    logger_->info("Server started on port {}", port_);
 
     return true;
 }
@@ -57,7 +68,8 @@ void Server::stop()
         {
             accept_thread.join();
         }
-        // 关闭日志
+        logger_->info("Server stopped");
+        spdlog::shutdown();
     }
 }
 
@@ -66,7 +78,7 @@ bool Server::setup_socket()
     server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd_ < 0)
     {
-        std::cerr << "server_fd_ creation failed" << std::endl;
+        logger_->error("server_fd_ creation failed");
         return false;
     }
 
@@ -77,13 +89,13 @@ bool Server::setup_socket()
 
     if (bind(server_fd_, (struct sockaddr *)&address, sizeof(address)) < 0)
     {
-        std::cerr << "Bind failed" << std::endl;
+        logger_->error("Bind failed on port {}: {}", port_, strerror(errno));
         return false;
     }
 
     if (listen(server_fd_, 5) < 0)
     {
-        std::cerr << "Listen failed" << std::endl;
+        logger_->error("Listen failed: {}", strerror(errno));
         return false;
     }
 
@@ -107,7 +119,7 @@ void Server::accept_connection()
         int activity = select(server_fd_ + 1, &read_fds, nullptr, nullptr, &timeout);
         if ((activity < 0) && (errno != EINTR))
         {
-            std::cerr << "Select error";
+            logger_->error("Select error: {}", strerror(errno));
             continue;
         }
         if ((activity > 0) && FD_ISSET(server_fd_, &read_fds))
@@ -115,7 +127,7 @@ void Server::accept_connection()
             int new_sock = accept(server_fd_, (struct sockaddr *)&client_addr, &addr_len);
             if (new_sock < 0)
             {
-                std::cerr << "Accept failed" << std::endl;
+                logger_->error("Accept failed: {}", strerror(errno));
                 continue;
             }
             thread_pool_.enqueue([this, new_sock]
@@ -132,16 +144,16 @@ void Server::handle_client(int client_sock)
     {
         std::string msg(buffer);
         std::cout << "Recieved message: [" << msg << "]" << std::endl;
-
+        logger_->info("Received message: [{}]", msg);
         std::string response(msg);
         send(client_sock, response.c_str(), response.size(), 0);
     }
     close(client_sock);
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
-    if(argc != 2)
+    if (argc != 2)
     {
         std::cerr << "Usage: " << argv[0] << " <port>" << std::endl;
         return 1;
@@ -149,7 +161,7 @@ int main(int argc, char* argv[])
 
     int port = std::stoi(argv[1]);
     Server server(port);
-    if(!server.start())
+    if (!server.start())
     {
         return 1;
     }
