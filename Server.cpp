@@ -36,7 +36,6 @@ private:
     void handle_client(int client_sock);
 };
 
-// TODO: 添加日志
 bool Server::start()
 {
     if (!setup_socket())
@@ -139,15 +138,65 @@ void Server::accept_connection()
 void Server::handle_client(int client_sock)
 {
     char buffer[1024] = {0};
-    int nread = read(client_sock, buffer, 1024);
-    if (nread > 0)
+
+    while (true)
     {
-        std::string msg(buffer);
-        std::cout << "Recieved message: [" << msg << "]" << std::endl;
-        logger_->info("Received message: [{}]", msg);
-        std::string response(msg);
-        send(client_sock, response.c_str(), response.size(), 0);
+        ssize_t nread = ::recv(client_sock, buffer, sizeof(buffer), 0);
+
+        if (nread > 0)
+        {
+            std::string msg(buffer, static_cast<size_t>(nread));
+            logger_->info("Received message: [{}]", msg);
+
+            // 确保全部数据被发送（处理部分发送）
+            /* send发送的字节数可能小于实际发送的字节数，如以下情况
+             *  1. 内核发送缓冲区剩余空间不足；
+             *  2. 消息很大，内核分片后多次复制到内核缓冲区；
+             *  3. 非阻塞模式，send 会尽可能发送能立即写入的部分然后返回
+             */
+            const char *data = msg.data();
+            size_t remaining = msg.size();
+            ssize_t sent_total = 0;
+            while (remaining > 0)
+            {
+                ssize_t sent = send(client_sock, data + sent_total, remaining, MSG_NOSIGNAL); // MSG_NOSIGNAL 阻止触发 SIGPIPE 信号（否则程序会被终止）
+                if (sent < 0)
+                {
+                    if (errno == EINTR)
+                    {
+                        continue;
+                    }
+                    logger_->error("send failed: {}", std::strerror(errno));
+                    // 发送失败(可能对端已关闭/重置)，退出循环并关闭连接
+                    goto cleanup;
+                }
+                sent_total += sent;
+                remaining -= static_cast<size_t>(sent);
+            }
+            continue;
+        }
+        else if (nread == 0) // 对端有序关闭（FIN）
+        {
+            logger_->info("Client closed connection (peer performed orderly shutdown)");
+            break;
+        }
+        else // nread < 0，异常关闭
+        {
+            if (errno == EINTR) // 被信号中断，重试
+            {
+                continue;
+            }
+            if (errno == EAGAIN || errno == EWOULDBLOCK) // 非阻塞 socket 此时没有数据，继续等待可读事件
+            {
+                continue;
+            }
+            // 其他错误，记录并结束处理
+            logger_->warn("recv failed {}", std::strerror(errno));
+            break;
+        }
     }
+
+cleanup:
     close(client_sock);
 }
 

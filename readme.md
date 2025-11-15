@@ -36,8 +36,9 @@ Connection closed by foreign host.
 
 - [x] 引入spdlog, 添加日志打印
 - [x] 添加Makefile
-- [ ] 功能完善：不直接关闭连接，而是等客户端主动关闭或错误发生。
+- [x] 功能完善：不直接关闭连接，而是等客户端主动关闭或错误发生。
 - [ ] 对socket封装，符合RAII设计思想
 - [ ] 监听线程使用非阻塞的accept 替换 select
 - [ ] 添加信号处理 Ctrl C
 - [ ] 添加对http协议的解析
+- [ ] 添加服务器处理能力，不只回显，而是根据请求执行相应任务
