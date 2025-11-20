@@ -21,7 +21,7 @@ make
 Server started on port 7788
 Press Enter to stop the server..
 ```
-用telnet连接服务器，输入任意内容，你可以看到服务器返回你输入的内容并关闭连接
+用telnet连接服务器，输入任意内容，你可以看到服务器返回你输入的内容。
 ```sh
 ❯ telnet localhost 7788
 Trying 127.0.0.1...
@@ -29,7 +29,7 @@ Connected to localhost.
 Escape character is '^]'.
 Hello # 用户输入
 Hello # 服务器响应
-Connection closed by foreign host.
+...... 
 ```
 
 ## TODO List (优先级从高到低)
@@ -37,8 +37,9 @@ Connection closed by foreign host.
 - [x] 引入spdlog, 添加日志打印
 - [x] 添加Makefile
 - [x] 功能完善：不直接关闭连接，而是等客户端主动关闭或错误发生。
+- [x] 添加对http协议的解析
 - [ ] 对socket封装，符合RAII设计思想
 - [ ] 监听线程使用非阻塞的accept 替换 select
 - [ ] 添加信号处理 Ctrl C
-- [ ] 添加对http协议的解析
-- [ ] 添加服务器处理能力，不只回显，而是根据请求执行相应任务
+
+- [ ] 实现router，将http请求路由到对应的处理程序
