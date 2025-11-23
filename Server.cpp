@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
@@ -6,6 +7,7 @@
 #include "ThreadPool.h"
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/basic_file_sink.h"
+#include "Http.h"
 
 class Server
 {
@@ -148,14 +150,32 @@ void Server::handle_client(int client_sock)
             std::string msg(buffer, static_cast<size_t>(nread));
             logger_->info("Received message: [{}]", msg);
 
+            http::HttpParser parser;
+            http::HttpRequest req;
+            http::ParseResult status = parser.parse(msg, req);
+            if (status != http::ParseResult::OK)
+            {
+                std::cout << "HTTP Parse Error";
+            }
+            http::Handler handler = http::g_router.match(req.method, req.uri);
+            http::HttpResponse response;
+            if (handler != nullptr)
+                handler(req, response);
+            else
+            {
+                std::cout << "ERROR: handler is invalid";
+                break;
+            }
+
+            std::string result = response.serialize();
             // 确保全部数据被发送（处理部分发送）
             /* send发送的字节数可能小于实际发送的字节数，如以下情况
              *  1. 内核发送缓冲区剩余空间不足；
              *  2. 消息很大，内核分片后多次复制到内核缓冲区；
              *  3. 非阻塞模式，send 会尽可能发送能立即写入的部分然后返回
              */
-            const char *data = msg.data();
-            size_t remaining = msg.size();
+            const char *data = result.data();
+            size_t remaining = result.size();
             ssize_t sent_total = 0;
             while (remaining > 0)
             {
@@ -200,8 +220,32 @@ cleanup:
     close(client_sock);
 }
 
+void cat(const http::HttpRequest &request, http::HttpResponse &response)
+{
+    std::string perfix = "WEB_INF";
+    std::string path = perfix + request.uri;
+    std::ifstream file(path);
+
+    std::string line;
+    while (getline(file, line))
+    {
+        response.body += line + "\n";
+    }
+    file.close();
+    response.version = "1.1";
+    response.status_code = 200;
+    response.reason_phrase = "OK";
+    response.headers["Content-Type"] = "text/html; charset=utf-8";
+}
+
+void load_path()
+{
+    http::g_router.addRoute("GET", "/index.html", cat);
+}
+
 int main(int argc, char *argv[])
 {
+    load_path();
     if (argc != 2)
     {
         std::cerr << "Usage: " << argv[0] << " <port>" << std::endl;
