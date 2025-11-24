@@ -220,11 +220,26 @@ cleanup:
     close(client_sock);
 }
 
+/*TODO: 异常处理*/
 void cat(const http::HttpRequest &request, http::HttpResponse &response)
 {
     std::string perfix = "WEB_INF";
-    std::string path = perfix + request.uri;
+    std::string path = "";
+    if (request.uri != "/")
+        path = perfix + request.uri;
+    else
+        path = perfix + "/index.html";
     std::ifstream file(path);
+
+    if (!file.is_open())
+    {
+        response.version = "HTTP/1.1";
+        response.status_code = 404;
+        response.reason_phrase = "Not Found";
+        response.headers["Content-Type"] = "text/html; charset=utf-8";
+        response.body = "<html><body><h1>404 Not Found</h1></body></html>";
+        return;
+    }
 
     std::string line;
     while (getline(file, line))
@@ -232,7 +247,7 @@ void cat(const http::HttpRequest &request, http::HttpResponse &response)
         response.body += line + "\n";
     }
     file.close();
-    response.version = "1.1";
+    response.version = "HTTP/1.1";
     response.status_code = 200;
     response.reason_phrase = "OK";
     response.headers["Content-Type"] = "text/html; charset=utf-8";
