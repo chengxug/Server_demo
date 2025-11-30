@@ -17,20 +17,12 @@ make
 
 启动服务器，你会看到如下输出
 ```sh
+cd build
 ./server 7788
 Server started on port 7788
 Press Enter to stop the server..
 ```
-用telnet连接服务器，输入任意内容，你可以看到服务器返回你输入的内容。
-```sh
-❯ telnet localhost 7788
-Trying 127.0.0.1...
-Connected to localhost.
-Escape character is '^]'.
-Hello # 用户输入
-Hello # 服务器响应
-...... 
-```
+在浏览器访问server，你可以看到index.html中的内容被正确返回。
 
 ## TODO List (优先级从高到低)
 
@@ -38,8 +30,10 @@ Hello # 服务器响应
 - [x] 添加Makefile
 - [x] 功能完善：不直接关闭连接，而是等客户端主动关闭或错误发生。
 - [x] 添加对http协议的解析
-- [ ] 对socket封装，符合RAII设计思想
+- [x] 实现router，将http请求路由到对应的处理程序
+- [x] 编写测试程序计算qps
+- [ ] 对socket封装，依据RAII设计思想
 - [ ] 监听线程使用非阻塞的accept 替换 select
 - [ ] 添加信号处理 Ctrl C
-
-- [x] 实现router，将http请求路由到对应的处理程序
+- [ ] 编写测试脚本tests/test.sh，在Makefile中调用以执行所有测试
+- [ ] 参考[proxygen](https://github.com/facebook/proxygen)优化解析器和路由的设计
