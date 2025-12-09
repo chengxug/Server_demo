@@ -32,6 +32,7 @@ Press Enter to stop the server..
 - [x] 添加对http协议的解析
 - [x] 实现router，将http请求路由到对应的处理程序
 - [x] 编写测试程序计算qps
+- [x] 优化测试程序：使用条件变量控制所有工作线程准备好后一起开始
 - [ ] 对socket封装，依据RAII设计思想
 - [ ] 监听线程使用非阻塞的accept 替换 select
 - [ ] 添加信号处理 Ctrl C
