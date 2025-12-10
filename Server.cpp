@@ -3,11 +3,14 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "ThreadPool.h"
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/basic_file_sink.h"
 #include "Http.h"
+
+using handler_t = void (*)(int);
 
 class Server
 {
@@ -258,17 +261,66 @@ void load_path()
     http::g_router.addRoute("GET", "/index.html", cat);
 }
 
+// 注册信号处理函数的包装函数
+handler_t Signal (int signum, handler_t handler)
+{
+    struct sigaction act, old_act;
+    act.sa_handler = handler;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = 0;
+    if (sigaction(signum, &act, &old_act) < 0)
+    {
+        return SIG_ERR;
+    }
+    return old_act.sa_handler;
+}
+
+void sigint_handler(int signum)
+{
+    (void)signum; // unused
+    std::cout << "Received SIGINT, shutting down server..." << std::endl;
+    spdlog::shutdown();
+    exit(0);
+}
+
+void usage(const char* prog)
+{
+    std::cout << "Usage: " << prog << " [options]\n"
+              << "Options:\n"
+              << "  -p <port>        target port (default 7788)\n"
+              << "  -t <threads>     number of threads (default 4)\n"
+              << "  -h               display this help message\n";
+}
+
 int main(int argc, char *argv[])
 {
     load_path();
-    if (argc != 2)
+
+    Signal(SIGINT, sigint_handler);
+
+    int port = 7788;
+    int thread_num = 4;
+    int opt;
+    while ((opt = getopt(argc, argv, "p:t:h")) != -1)
     {
-        std::cerr << "Usage: " << argv[0] << " <port>" << std::endl;
-        return 1;
+        switch(opt)
+        {
+            case 'p':
+                port = std::stoi(optarg);
+                break;
+            case 't':
+                thread_num = std::stoi(optarg);
+                break;
+            case 'h':
+                usage(argv[0]);
+                return 0;
+            default:
+                usage(argv[0]);
+                return 1;
+        }
     }
 
-    int port = std::stoi(argv[1]);
-    Server server(port);
+    Server server(port, thread_num);
     if (!server.start())
     {
         return 1;
