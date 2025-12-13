@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include "Http.h"
+#include "Socket.h"
 #include "ThreadPool.h"
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/spdlog.h"
@@ -18,14 +19,14 @@ public:
     Server(int p)
         : port_(p)
         , thread_pool_(4)
-        , server_fd_(-1)
+        , server_sock_(-1)
     {
         logger_ = spdlog::basic_logger_mt("basic_logger", "logs/server.log");
     }
     Server(int p, size_t pool_size)
         : port_(p)
         , thread_pool_(pool_size)
-        , server_fd_(-1)
+        , server_sock_(-1)
     {
         logger_ = spdlog::basic_logger_mt("basic_logger", "logs/server.log");
     }
@@ -37,7 +38,7 @@ public:
 private:
     int                             port_;
     ThreadPool                      thread_pool_;
-    int                             server_fd_;
+    Socket                          server_sock_;
     bool                            running_;
     std::thread                     accept_thread;
     std::shared_ptr<spdlog::logger> logger_;
@@ -70,9 +71,8 @@ void Server::stop()
         running_ = false;
 
         // 关闭Server监听的文件描述符
-        shutdown(server_fd_, SHUT_RDWR);
-        close(server_fd_);
-        server_fd_ = -1;
+        server_sock_.shutdownWrite();
+        server_sock_.close();
         // 等待 accept_thread 线程退出
         if (accept_thread.joinable())
         {
@@ -85,10 +85,18 @@ void Server::stop()
 
 bool Server::setup_socket()
 {
-    server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd_ < 0)
+    // server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
+    // if (server_fd_ < 0)
+    // {
+    //     logger_->error("server_fd_ creation failed");
+    //     return false;
+    // }
+    server_sock_ = Socket(socket(AF_INET, SOCK_STREAM, 0));
+    if (server_sock_.fd() < 0)
     {
-        logger_->error("server_fd_ creation failed");
+        logger_->error("server_sock_ creation failed: error code {} errmsg {}",
+                       server_sock_.getSocketError(),
+                       strerror(errno));
         return false;
     }
 
@@ -97,15 +105,20 @@ bool Server::setup_socket()
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(port_);
 
-    if (bind(server_fd_, (struct sockaddr*)&address, sizeof(address)) < 0)
+    if (!server_sock_.bind(address))
     {
-        logger_->error("Bind failed on port {}: {}", port_, strerror(errno));
+        logger_->error("server_sock_ bind failed; port: {}, error code: {}, errmsg: {}",
+                       port_,
+                       server_sock_.getSocketError(),
+                       strerror(errno));
         return false;
     }
 
-    if (listen(server_fd_, 5) < 0)
+    if (!server_sock_.listen(128))
     {
-        logger_->error("Listen failed: {}", strerror(errno));
+        logger_->error("server_sock_ listen failed: error code {}, errmsg {}",
+                       server_sock_.getSocketError(),
+                       strerror(errno));
         return false;
     }
 
@@ -120,21 +133,21 @@ void Server::accept_connection()
     {
         fd_set read_fds;
         FD_ZERO(&read_fds);
-        FD_SET(server_fd_, &read_fds);
+        FD_SET(server_sock_.fd(), &read_fds);
 
         struct timeval timeout;
         timeout.tv_sec = 1;
         timeout.tv_usec = 0;
 
-        int activity = select(server_fd_ + 1, &read_fds, nullptr, nullptr, &timeout);
+        int activity = select(server_sock_.fd() + 1, &read_fds, nullptr, nullptr, &timeout);
         if ((activity < 0) && (errno != EINTR))
         {
             logger_->error("Select error: {}", strerror(errno));
             continue;
         }
-        if ((activity > 0) && FD_ISSET(server_fd_, &read_fds))
+        if ((activity > 0) && FD_ISSET(server_sock_.fd(), &read_fds))
         {
-            int new_sock = accept(server_fd_, (struct sockaddr*)&client_addr, &addr_len);
+            int new_sock = server_sock_.accept(&client_addr, &addr_len);
             if (new_sock < 0)
             {
                 logger_->error("Accept failed: {}", strerror(errno));
@@ -269,6 +282,8 @@ void cat(const http::HttpRequest& request, http::HttpResponse& response)
 void load_path()
 {
     http::g_router.addRoute("GET", "/index.html", cat);
+    http::g_router.addRoute("GET", "/", cat);
+    http::g_router.addRoute("GET", "/Notebook.html", cat);
 }
 
 // 注册信号处理函数的包装函数
@@ -333,6 +348,8 @@ int main(int argc, char* argv[])
     Server server(port, thread_num);
     if (!server.start())
     {
+        std::cout << "Failed to start server" << std::endl;
+
         return 1;
     }
 

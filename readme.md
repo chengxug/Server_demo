@@ -36,8 +36,10 @@ Press Enter to stop the server..
 - [x] 实现router，将http请求路由到对应的处理程序
 - [x] 编写测试程序计算qps
 - [x] 优化测试程序：使用条件变量控制所有工作线程准备好后一起开始
-- [ ] 对socket封装，依据RAII设计思想
+- [x] 对socket封装，依据RAII设计思想
 - [ ] 监听线程使用非阻塞的accept 替换 select
 - [x] 添加信号处理 Ctrl C
 - [ ] 编写测试脚本tests/test.sh，在Makefile中调用以执行所有测试
+- [ ] Makefile 支持 debug 和 release
 - [ ] 参考[proxygen](https://github.com/facebook/proxygen)优化解析器和路由的设计
+- [ ] 打印 std::function 包装的函数的名称，以调试使用

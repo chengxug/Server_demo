@@ -1,5 +1,5 @@
 CXX := g++
-CXXFLAGS := -std=c++11 -Wall -Wextra -Iinclude
+CXXFLAGS := -std=c++11 -Wall -Wextra -Iinclude -g -fsanitize=address
 
 SRCS := Server.cpp
 TARGET := server

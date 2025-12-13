@@ -166,7 +166,7 @@ public:
 class RadixRouter
 {
 public:
-    RadixRouter(std::string rt = "/")
+    RadixRouter(std::string rt = "")
         : root(new RadixRouteNode(rt))
     {
     }
