@@ -1,25 +1,31 @@
-#include <iostream>
 #include <fstream>
-#include <sys/socket.h>
+#include <iostream>
 #include <netinet/in.h>
-#include <unistd.h>
 #include <signal.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
-#include "ThreadPool.h"
-#include "spdlog/spdlog.h"
-#include "spdlog/sinks/basic_file_sink.h"
 #include "Http.h"
+#include "ThreadPool.h"
+#include "spdlog/sinks/basic_file_sink.h"
+#include "spdlog/spdlog.h"
 
 using handler_t = void (*)(int);
 
 class Server
 {
 public:
-    Server(int p) : port_(p), thread_pool_(4), server_fd_(-1)
+    Server(int p)
+        : port_(p)
+        , thread_pool_(4)
+        , server_fd_(-1)
     {
         logger_ = spdlog::basic_logger_mt("basic_logger", "logs/server.log");
     }
-    Server(int p, size_t pool_size) : port_(p), thread_pool_(pool_size), server_fd_(-1)
+    Server(int p, size_t pool_size)
+        : port_(p)
+        , thread_pool_(pool_size)
+        , server_fd_(-1)
     {
         logger_ = spdlog::basic_logger_mt("basic_logger", "logs/server.log");
     }
@@ -29,14 +35,14 @@ public:
     void stop();
 
 private:
-    int port_;
-    ThreadPool thread_pool_;
-    int server_fd_;
-    bool running_;
-    std::thread accept_thread;
+    int                             port_;
+    ThreadPool                      thread_pool_;
+    int                             server_fd_;
+    bool                            running_;
+    std::thread                     accept_thread;
     std::shared_ptr<spdlog::logger> logger_;
 
-    bool setup_socket(); // 创建socket, 并设置socket
+    bool setup_socket();   // 创建socket, 并设置socket
     void accept_connection();
     void handle_client(int client_sock);
 };
@@ -91,7 +97,7 @@ bool Server::setup_socket()
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(port_);
 
-    if (bind(server_fd_, (struct sockaddr *)&address, sizeof(address)) < 0)
+    if (bind(server_fd_, (struct sockaddr*)&address, sizeof(address)) < 0)
     {
         logger_->error("Bind failed on port {}: {}", port_, strerror(errno));
         return false;
@@ -109,7 +115,7 @@ bool Server::setup_socket()
 void Server::accept_connection()
 {
     struct sockaddr_in client_addr;
-    socklen_t addr_len = sizeof(client_addr);
+    socklen_t          addr_len = sizeof(client_addr);
     while (running_)
     {
         fd_set read_fds;
@@ -128,14 +134,13 @@ void Server::accept_connection()
         }
         if ((activity > 0) && FD_ISSET(server_fd_, &read_fds))
         {
-            int new_sock = accept(server_fd_, (struct sockaddr *)&client_addr, &addr_len);
+            int new_sock = accept(server_fd_, (struct sockaddr*)&client_addr, &addr_len);
             if (new_sock < 0)
             {
                 logger_->error("Accept failed: {}", strerror(errno));
                 continue;
             }
-            thread_pool_.enqueue([this, new_sock]
-                                 { handle_client(new_sock); });
+            thread_pool_.enqueue([this, new_sock] { handle_client(new_sock); });
         }
     }
 }
@@ -153,14 +158,14 @@ void Server::handle_client(int client_sock)
             std::string msg(buffer, static_cast<size_t>(nread));
             logger_->info("Received message: [{}]", msg);
 
-            http::HttpParser parser;
+            http::HttpParser  parser;
             http::HttpRequest req;
             http::ParseResult status = parser.parse(msg, req);
             if (status != http::ParseResult::OK)
             {
                 std::cout << "HTTP Parse Error";
             }
-            http::Handler handler = http::g_router.match(req.method, req.uri);
+            http::Handler      handler = http::g_router.match(req.method, req.uri);
             http::HttpResponse response;
             if (handler != nullptr)
                 handler(req, response);
@@ -177,12 +182,16 @@ void Server::handle_client(int client_sock)
              *  2. 消息很大，内核分片后多次复制到内核缓冲区；
              *  3. 非阻塞模式，send 会尽可能发送能立即写入的部分然后返回
              */
-            const char *data = result.data();
-            size_t remaining = result.size();
-            ssize_t sent_total = 0;
+            const char* data = result.data();
+            size_t      remaining = result.size();
+            ssize_t     sent_total = 0;
             while (remaining > 0)
             {
-                ssize_t sent = send(client_sock, data + sent_total, remaining, MSG_NOSIGNAL); // MSG_NOSIGNAL 阻止触发 SIGPIPE 信号（否则程序会被终止）
+                ssize_t sent =
+                    send(client_sock,
+                         data + sent_total,
+                         remaining,
+                         MSG_NOSIGNAL);   // MSG_NOSIGNAL 阻止触发 SIGPIPE 信号（否则程序会被终止）
                 if (sent < 0)
                 {
                     if (errno == EINTR)
@@ -198,18 +207,19 @@ void Server::handle_client(int client_sock)
             }
             continue;
         }
-        else if (nread == 0) // 对端有序关闭（FIN）
+        else if (nread == 0)   // 对端有序关闭（FIN）
         {
             logger_->info("Client closed connection (peer performed orderly shutdown)");
             break;
         }
-        else // nread < 0，异常关闭
+        else   // nread < 0，异常关闭
         {
-            if (errno == EINTR) // 被信号中断，重试
+            if (errno == EINTR)   // 被信号中断，重试
             {
                 continue;
             }
-            if (errno == EAGAIN || errno == EWOULDBLOCK) // 非阻塞 socket 此时没有数据，继续等待可读事件
+            if (errno == EAGAIN ||
+                errno == EWOULDBLOCK)   // 非阻塞 socket 此时没有数据，继续等待可读事件
             {
                 continue;
             }
@@ -224,7 +234,7 @@ cleanup:
 }
 
 /*TODO: 异常处理*/
-void cat(const http::HttpRequest &request, http::HttpResponse &response)
+void cat(const http::HttpRequest& request, http::HttpResponse& response)
 {
     std::string perfix = "WEB_INF";
     std::string path = "";
@@ -262,7 +272,7 @@ void load_path()
 }
 
 // 注册信号处理函数的包装函数
-handler_t Signal (int signum, handler_t handler)
+handler_t Signal(int signum, handler_t handler)
 {
     struct sigaction act, old_act;
     act.sa_handler = handler;
@@ -277,7 +287,7 @@ handler_t Signal (int signum, handler_t handler)
 
 void sigint_handler(int signum)
 {
-    (void)signum; // unused
+    (void)signum;   // unused
     std::cout << "Received SIGINT, shutting down server..." << std::endl;
     spdlog::shutdown();
     exit(0);
@@ -292,7 +302,7 @@ void usage(const char* prog)
               << "  -h               display this help message\n";
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     load_path();
 
@@ -303,7 +313,7 @@ int main(int argc, char *argv[])
     int opt;
     while ((opt = getopt(argc, argv, "p:t:h")) != -1)
     {
-        switch(opt)
+        switch (opt)
         {
             case 'p':
                 port = std::stoi(optarg);
