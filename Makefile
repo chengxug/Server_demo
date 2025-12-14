@@ -30,12 +30,10 @@ $(BUILD_DIR)/tests/%: $(TEST_DIR)/%.cpp | $(BUILD_DIR)/tests
 
 tests: $(TEST_BINS)
 
-# run all tests (stop on first failure)
+# run all tests
 run-tests: tests
-	@for t in $(TEST_BINS); do \
-		echo "Running $$t"; \
-		./$$t || exit $$?; \
-	done
+	@chmod +x ./tests/test.sh
+	@./tests/test.sh
 
 clean:
 	rm -rf $(BUILD_DIR)
