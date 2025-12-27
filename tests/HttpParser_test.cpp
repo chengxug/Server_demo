@@ -23,16 +23,15 @@ public:
         request_line_called = true;
     }
 
-    void onHeader(std::string& name, std::string& value) override
+    void onHeader(const std::string& name, const std::string& value) override
     {
         // 记录最后一个 header，证明该回调被触发
         last_header = {name, value};
         header_called = true;
     }
 
-    void onHeadersComplete(Headers& header) override
+    void onHeadersComplete() override
     {
-        req.headers = header;
         headers_complete_called = true;
     }
 
@@ -82,7 +81,6 @@ int main()
         assert(cb.req.method == "GET");
         assert(cb.req.uri == "/");
         assert(cb.req.version == "HTTP/1.1");
-        assert(cb.req.headers.at("Host") == "example.com");
         assert(cb.req.body.empty());
     }
 
@@ -107,7 +105,6 @@ int main()
         assert(!cb.error_called);
         assert(cb.req.method == "POST");
         assert(cb.req.uri == "/form");
-        assert(cb.req.headers.at("Content-Length") == "27");
         assert(cb.req.body == body);
     }
 

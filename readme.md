@@ -1,6 +1,14 @@
 # Server Demo
 
-此项目是一个个人学习项目，旨在从基本的多线程服务器开始，一步步完善，直到实现一个现代的服务器。
+此项目是一个个人学习项目，旨在从一个最基本的迭代服务器，完善到现代的服务器模型，以探究在现代服务器中，所使用的各种技术，是为了解决什么问题，定量的探究所用技术带来的性能提升。
+
+## 起因
+
+此项目起源于我之前学习实现的一个httpServer, 在做它的过程中，我了解和使用了包括 Reactor、Epoll在内的很多设计和技术，但是对为什么这么做，这么性能上有多大的提升还是有些模糊。
+
+就我个人的视角，计算机是一门理论和实践结合的工程学科。我们现在所学习的技术大多是计算机在发展过程中遇到的现实问题的解决方案。要明白为什么要这么做，首先需要了解这么做是为了解决什么问题。
+
+所以，诞生了这个想法，以总结历史的视角，看看现在所用的技术是为了解决什么问题，带来的性能提升有多大。
 
 ## 服务器目前已实现的功能
 
@@ -43,3 +51,15 @@ Press Enter to stop the server..
 - [ ] Makefile 支持 debug 和 release
 - [ ] 参考[proxygen](https://github.com/facebook/proxygen)优化解析器和路由的设计
 - [ ] 打印 std::function 包装的函数的名称，以调试使用
+
+## Third-Party Code
+
+本项目使用了以下开源仓库的代码。
+
+- [spdlog](https://github.com/gabime/spdlog)  
+  A fast C++ logging library.  
+  License: MIT
+
+- [ThreadPool](https://github.com/progschj/ThreadPool)  
+  A simple C++11 thread pool implementation.  
+  License: Zlib

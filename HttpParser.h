@@ -11,10 +11,10 @@ public:
     virtual void onRequestLine(const std::string& method, const std::string& path,
                                const std::string& version) = 0;   // 请求行解析完成时调用
 
-    virtual void onHeader(std::string& name,
-                          std::string& value) = 0;   // 请求头回调,每解析一行调用一次
+    virtual void onHeader(const std::string& name,
+                          const std::string& value) = 0;   // 请求头回调,每解析一行调用一次
 
-    virtual void onHeadersComplete(Headers& header) = 0;   // 请求头解析完成回调
+    virtual void onHeadersComplete() = 0;   // 请求头解析完成回调
 
     virtual void onBody(const char* data, size_t len) = 0;   // 请求体回调
 
@@ -200,7 +200,7 @@ bool HttpParser::parseHeaders()
         callback_->onHeader(key, value);   // 调用请求头回调
     }
 
-    callback_->onHeadersComplete(headers);   // 请求头解析完成回调
+    callback_->onHeadersComplete();   // 请求头解析完成回调
 
     if (headers.find("Content-Length") != headers.end())
     {
