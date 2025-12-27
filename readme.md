@@ -47,9 +47,10 @@ Press Enter to stop the server..
 - [x] 对socket封装，依据RAII设计思想
 - [ ] 监听线程使用非阻塞的accept 替换 select
 - [x] 添加信号处理 Ctrl C
-- [ ] 编写测试脚本tests/test.sh，在Makefile中调用以执行所有测试
+- [x] 编写测试脚本tests/test.sh，在Makefile中调用以执行所有测试
 - [ ] Makefile 支持 debug 和 release
-- [ ] 参考[proxygen](https://github.com/facebook/proxygen)优化解析器和路由的设计
+- [x] 参考[proxygen](https://github.com/facebook/proxygen)优化解析器和路由的设计
+- [ ] 接入优化后的解析器和路由到项目中
 - [ ] 打印 std::function 包装的函数的名称，以调试使用
 
 ## Third-Party Code
