@@ -202,26 +202,38 @@ bool HttpParser::parseHeaders()
 
     callback_->onHeadersComplete();   // 请求头解析完成回调
 
-    if (headers.find("Content-Length") != headers.end())
+    bool   isChunked = false;
+    size_t contentLength = 0;
+    auto   it = headers.find("Transfer-Encoding");
+    if (it != headers.end() && it->second == "chunked")
     {
-        contentLength = std::stoul(headers["Content-Length"]);
+        isChunked = true;
+    }
+
+    it = headers.find("Content-Length");
+    if (it != headers.end())
+    {
+        contentLength = std::stoul(it->second);
+    }
+
+    if (isChunked)
+    {
+        // 未实现Chunked传输编码的解析
+        error_code = 501;   // 错误代码：501 Not Implemented
+        error_message = "Chunked Transfer-Encoding not implemented";
+        state = ParserState::ERROR;
+        return false;
+    }
+    else if (contentLength > 0)
+    {
+        this->contentLength = contentLength;
         bodyBytesRead = 0;
-        if (contentLength == 0)
-        {
-            state = ParserState::COMPLETE;    // 如果没有请求体，直接进入完成状态
-            callback_->onMessageComplete();   // 调用消息完成回调
-        }
-        else
-        {
-            state = ParserState::BODY_CONTENT_LENGTH;   // 进入请求体解析状态
-        }
+        state = ParserState::BODY_CONTENT_LENGTH;   // 进入请求体解析状态
     }
     else
     {
-        error_code = 501;   // 错误代码：501 Not Implemented
-        error_message = "Content-Length header is required";
-        state = ParserState::ERROR;
-        return false;   // Content-Length头部缺失
+        state = ParserState::COMPLETE;    // 如果没有请求体，直接进入完成状态
+        callback_->onMessageComplete();   // 调用消息完成回调
     }
     return true;
 }

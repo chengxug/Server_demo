@@ -6,8 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
-/* HTTP 路由的实现
- * 路由使用 Radix tree实现
+/**
+ * Router: 基于Radix Tree实现的HTTP请求路由
  */
 
 enum class HttpMethod
@@ -30,15 +30,27 @@ struct HttpRequest
     std::string body;
 };
 
+struct HttpResponse
+{
+    int         status_code;
+    std::string status_message;
+    Headers     headers;
+    std::string body;
+};
+
 using RouteParams = std::unordered_map<std::string, std::string>;
 
 class RequestHandler
 {
 public:
-    virtual void onRequest(HttpRequest& request, RouteParams& params) = 0;
-    virtual void onBody(const char* data, size_t len) = 0;
-    virtual void onEOM() = 0;
+    virtual void           onRequest(HttpRequest& request, RouteParams& params) = 0;
+    virtual void           onBody(const char* data, size_t len) = 0;
+    virtual void           onEOM() = 0;
+    virtual HttpResponse&& takeResponse() = 0;   // 在请求结束时调用，获取响应
     virtual ~RequestHandler() = default;
+
+protected:
+    HttpResponse response_;
 };
 
 struct RadixNode
