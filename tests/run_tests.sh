@@ -6,13 +6,13 @@ TEST_DIR="${1:-build/tests}" # -：参数为空或未传入时使用默认值 (�
 
 # 在此列表中新增测试用例，可包含参数：
 # 示例：
-#   "${TEST_DIR}/echo_test --port 9000"
-#   "${TEST_DIR}/http_test --url http://localhost:8080"
+# "${TEST_DIR}/benchmark -n 10000 -p 7788"
+
 TESTS=(
   # "${TEST_DIR}/sample_test"
     "${TEST_DIR}/http_parse_test"
     "${TEST_DIR}/HttpParser_test"
-    "${TEST_DIR}/benchmark_test -n 10000 -p 7788"
+    "${TEST_DIR}/HttpRouter_test"
 )
 
 if [[ ${#TESTS[@]} -eq 0 ]]; then

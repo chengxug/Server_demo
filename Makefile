@@ -1,57 +1,90 @@
 CXX := g++
-CXXFLAGS := -std=c++11 -Wall -Wextra -Iinclude -g -fsanitize=address
+
+# 通用编译选项
+COMMON_FLAGS := -std=c++11 -Wall -Wextra -Iinclude -pthread
+
+# 默认模式为 release，可通过 make MODE=debug 切换
+MODE ?= release
+
+# 根据模式设置特定选项和输出目录
+ifeq ($(MODE), release)
+    CXXFLAGS := $(COMMON_FLAGS) -O3 -DNDEBUG
+    BUILD_ROOT := build/release
+else
+    # debug 模式：开启调试信息和地址检查
+    CXXFLAGS := $(COMMON_FLAGS) -g -O0 -fsanitize=address
+    BUILD_ROOT := build/debug
+endif
 
 SRCS := Server.cpp
-TARGET := server
+TARGET := $(BUILD_ROOT)/server
 
 BUILD_DIR := build
 
 # 简单Server的编译配置
 SIMPLE_DIR := simple_impl
 SIMPLE_SRCS := $(wildcard $(SIMPLE_DIR)/*.cpp)
-SIMPLE_BINS := $(patsubst $(SIMPLE_DIR)/%.cpp,$(BUILD_DIR)/simple_impl/%,$(SIMPLE_SRCS))
+SIMPLE_BINS := $(patsubst $(SIMPLE_DIR)/%.cpp,$(BUILD_ROOT)/simple_impl/%,$(SIMPLE_SRCS))
 
 # 测试文件的编译配置
 TEST_DIR := tests
 TEST_SRCS := $(wildcard $(TEST_DIR)/*.cpp)
-TEST_BINS := $(patsubst $(TEST_DIR)/%.cpp,$(BUILD_DIR)/tests/%,$(TEST_SRCS))
+TEST_BINS := $(patsubst $(TEST_DIR)/%.cpp,$(BUILD_ROOT)/tests/%,$(TEST_SRCS))
 
-.PHONY: all tests run-tests clean
+.PHONY: all tests run-tests run-benchmark clean
 
-all: $(BUILD_DIR)/$(TARGET) tests simple_impl
+all: $(TARGET) tests simple_impl
+
+# 打印帮助信息
+help:
+	@echo "Usage:"
+	@echo "  make [MODE=debug|release]    # Build main server (default: debug)"
+	@echo "  make tests [MODE=...]        # Build tests"
+	@echo "  make run-tests               # Run functional tests"
+	@echo "  make run-benchmark           # Run benchmark (recommend MODE=release)"
+	@echo "  make clean                   # Clean all builds"
 
 # ensure build directories exist
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
+$(BUILD_ROOT):
+	mkdir -p $(BUILD_ROOT)
 
-# 简单Server的输出目录
-$(BUILD_DIR)/simple_impl:
-	mkdir -p $(BUILD_DIR)/simple_impl
+$(BUILD_ROOT)/simple_impl:
+	mkdir -p $(BUILD_ROOT)/simple_impl
 
-# 测试程序的输出目录
-$(BUILD_DIR)/tests:
-	mkdir -p $(BUILD_DIR)/tests
+$(BUILD_ROOT)/tests:
+	mkdir -p $(BUILD_ROOT)/tests
 
 # 主程序的编译规则
-$(BUILD_DIR)/$(TARGET): $(SRCS) | $(BUILD_DIR)
+$(TARGET): $(SRCS) | $(BUILD_ROOT)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-# each test .cpp -> build/tests/<name>
-$(BUILD_DIR)/tests/%: $(TEST_DIR)/%.cpp | $(BUILD_DIR)/tests
+# each test .cpp -> build/<mode>/tests/<name>
+$(BUILD_ROOT)/tests/%: $(TEST_DIR)/%.cpp | $(BUILD_ROOT)/tests
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
-# 将 simple_implementation/*.cpp 编译到 build/simple_impl/*
-$(BUILD_DIR)/simple_impl/%: $(SIMPLE_DIR)/%.cpp | $(BUILD_DIR)/simple_impl
+# simple_implementation -> build/<mode>/simple_impl/<name>
+$(BUILD_ROOT)/simple_impl/%: $(SIMPLE_DIR)/%.cpp | $(BUILD_ROOT)/simple_impl
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
 tests: $(TEST_BINS)
 
 simple_impl: $(SIMPLE_BINS)
 
-# run all tests
+# 执行功能测试 (默认使用当前 MODE 构建的程序)
 run-tests: tests
-	@chmod +x ./tests/test.sh
-	@./tests/test.sh
+	@echo "Running functional tests ($(MODE) mode)..."
+	@chmod +x ./tests/run_tests.sh
+	@# 传递构建目录给脚本，以便脚本知道去哪里找可执行文件
+	@./tests/run_tests.sh $(BUILD_ROOT)
+
+# 执行性能基准测试
+run-benchmark: tests
+	@echo "Running benchmark tests ($(MODE) mode)..."
+	@if [ "$(MODE)" = "debug" ]; then \
+	    echo "WARNING: Running benchmark in DEBUG mode. Use 'make run-benchmark MODE=release' for accurate results."; \
+	fi
+	@chmod +x ./tests/run_benchmark.sh
+	@./tests/run_benchmark.sh $(BUILD_ROOT)
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_ROOT)

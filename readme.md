@@ -22,6 +22,7 @@
 
 ## 当前功能特性
 - [x] **基础的 HTTP 通信支持**：解析 HTTP GET 请求，返回静态资源。
+- [x] **HTTP Parser**：基于有限状态机模型的HTTP请求解析器
 - [x] **路由系统**：支持根据 URL 路径分发请求。
 - [x] **性能测试**：包含 QPS 计算与并发测试脚本(完善中)。
 
@@ -68,7 +69,7 @@ Press Enter to stop the server..
 - [ ] 监听线程使用非阻塞的accept 替换 select
 - [x] 添加信号处理 Ctrl C
 - [x] 编写测试脚本tests/test.sh，在Makefile中调用以执行所有测试
-- [ ] Makefile 支持 debug 和 release
+- [x] Makefile 支持 debug 和 release
 - [x] 参考[proxygen](https://github.com/facebook/proxygen)优化解析器和路由的设计
 - [ ] 接入优化后的解析器和路由到项目中
 - [ ] 打印 std::function 包装的函数的名称，以调试使用
