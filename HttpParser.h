@@ -157,31 +157,65 @@ bool HttpParser::parseRequestLine()
 
 /**
  * 解析HTTP请求头
- * Chunked传输编码未实现, 仅支持Content-Length, 缺失Content-Length头部返回501错误
+ * Chunked传输编码未实现, 仅支持Content-Length
  */
 bool HttpParser::parseHeaders()
 {
-    size_t pos = buffer.find("\r\n\r\n");
-    if (pos == std::string::npos)
+    while (true)
     {
-        return false;   // 请求头未完整
-    }
-    std::string headerBlock = buffer.substr(0, pos + 2);
-    buffer.erase(0, pos + 4);   // 移除请求头和 CRLF
-    size_t start = 0;
-    while (start < headerBlock.size())
-    {
-        size_t end = headerBlock.find("\r\n", start);
-        if (end == std::string::npos)
+        size_t pos = buffer.find("\r\n");
+        if (pos == std::string::npos)
         {
-            error_code = 400;   // 错误代码：400 Bad Request
-            error_message = "Invalid header format";
-            state = ParserState::ERROR;
-            return false;   // 请求头格式错误
+            return false;   // 当前行不完整，等待更多数据
         }
 
-        std::string line = headerBlock.substr(start, end - start);
-        start = end + 2;   // 移动到下一行
+        if (pos == 0)   // 遇到空行，请求头结束
+        {
+            buffer.erase(0, 2);   // 移除最后的 CRLF
+
+            callback_->onHeadersComplete();   // 请求头解析完成回调
+
+            // 处理 Content-Length 和 Transfer-Encoding
+            bool   isChunked = false;
+            size_t contentLength = 0;
+            auto   it = headers.find("Transfer-Encoding");
+            if (it != headers.end() && it->second == "chunked")
+            {
+                isChunked = true;
+            }
+
+            it = headers.find("Content-Length");
+            if (it != headers.end())
+            {
+                contentLength = std::stoul(it->second);
+            }
+
+            if (isChunked)
+            {
+                // 未实现Chunked传输编码的解析
+                error_code = 501;   // 错误代码：501 Not Implemented
+                error_message = "Chunked Transfer-Encoding not implemented";
+                state = ParserState::ERROR;
+                return false;
+            }
+            else if (contentLength > 0)
+            {
+                this->contentLength = contentLength;
+                bodyBytesRead = 0;
+                state = ParserState::BODY_CONTENT_LENGTH;   // 进入请求体解析状态
+            }
+            else
+            {
+                state = ParserState::COMPLETE;   // 如果没有请求体，直接进入完成状态
+                callback_->onMessageComplete();   // 调用消息完成回调
+            }
+            return true;   // 状态已改变，返回 true 让 feed 循环继续处理后续数据
+        }
+
+        // 解析普通头部行
+        std::string line = buffer.substr(0, pos);
+        buffer.erase(0, pos + 2);   // 移除该行和 CRLF
+
         size_t colonPos = line.find(':');
         if (colonPos == std::string::npos)
         {
@@ -190,52 +224,19 @@ bool HttpParser::parseHeaders()
             state = ParserState::ERROR;
             return false;   // 请求头行格式错误
         }
+
         std::string key = line.substr(0, colonPos);
         std::string value = line.substr(colonPos + 1);
+
         // 去除key和value的空格
         key.erase(key.find_last_not_of(" \t") + 1);
         value.erase(0, value.find_first_not_of(" \t"));
-        headers[key] = value;   // 存储请求头
 
+        headers[key] = value;              // 存储请求头
         callback_->onHeader(key, value);   // 调用请求头回调
-    }
 
-    callback_->onHeadersComplete();   // 请求头解析完成回调
-
-    bool   isChunked = false;
-    size_t contentLength = 0;
-    auto   it = headers.find("Transfer-Encoding");
-    if (it != headers.end() && it->second == "chunked")
-    {
-        isChunked = true;
+        // 继续循环，处理 buffer 中可能存在的下一行
     }
-
-    it = headers.find("Content-Length");
-    if (it != headers.end())
-    {
-        contentLength = std::stoul(it->second);
-    }
-
-    if (isChunked)
-    {
-        // 未实现Chunked传输编码的解析
-        error_code = 501;   // 错误代码：501 Not Implemented
-        error_message = "Chunked Transfer-Encoding not implemented";
-        state = ParserState::ERROR;
-        return false;
-    }
-    else if (contentLength > 0)
-    {
-        this->contentLength = contentLength;
-        bodyBytesRead = 0;
-        state = ParserState::BODY_CONTENT_LENGTH;   // 进入请求体解析状态
-    }
-    else
-    {
-        state = ParserState::COMPLETE;    // 如果没有请求体，直接进入完成状态
-        callback_->onMessageComplete();   // 调用消息完成回调
-    }
-    return true;
 }
 
 bool HttpParser::parseBody()
@@ -254,7 +255,8 @@ bool HttpParser::parseBody()
     {
         state = ParserState::COMPLETE;    // 请求体解析完成
         callback_->onMessageComplete();   // 调用消息完成回调
+        return true;
     }
 
-    return true;
+    return false;
 }
