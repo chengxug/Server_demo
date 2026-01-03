@@ -71,8 +71,9 @@ Press Enter to stop the server..
 - [x] 编写测试脚本tests/test.sh，在Makefile中调用以执行所有测试
 - [x] Makefile 支持 debug 和 release
 - [x] 参考[proxygen](https://github.com/facebook/proxygen)优化解析器和路由的设计
-- [ ] 接入优化后的解析器和路由到项目中
+- [x] 接入优化后的解析器和路由到项目中
 - [ ] 打印 std::function 包装的函数的名称，以调试使用
+- [ ] 测试在不同并发量，不同负载下的性能表现
 
 ## Third-Party Code
 
