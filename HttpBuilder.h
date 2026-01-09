@@ -1,10 +1,11 @@
 #pragma once
-#include "HttpParser.h"
-#include "HttpRouter.h"
-#include "Logger.h"
-
+#include <memory>
+#include <spdlog/spdlog.h>
 #include <sys/socket.h>
 #include <unistd.h>
+
+#include "HttpParser.h"
+#include "HttpRouter.h"
 
 /**
  * HttpReqBuilder: Parser 和 Router 的桥梁，在 Parser 解析过程中构造 Http 请求，在 Router 中匹配
@@ -13,10 +14,11 @@
 class HttpReqBuilder : public HttpParserCallback
 {
 public:
-    HttpReqBuilder(Router& r, int sock)
+    HttpReqBuilder(Router& r, int sock, std::shared_ptr<spdlog::logger> logger)
         : router_(r)
         , client_sock_(sock)
         , done_(false)
+        , logger_(logger)
     {
     }
 
@@ -55,8 +57,7 @@ public:
         if (!handler_)
         {
             // 404 处理
-            if (g_logger)
-                g_logger->info("[404] Not Found: {}", req_.path);
+            logger_->debug("[404] Not Found: {}", req_.path);
             send_response(
                 client_sock_,
                 HttpResponse{
@@ -88,8 +89,7 @@ public:
 
     void onError(int code) override
     {
-        if (g_logger)
-            g_logger->error("Parser Error: {}", code);
+        logger_->error("Parser Error: {}", code);
         send_response(
             client_sock_,
             HttpResponse{
@@ -114,6 +114,7 @@ private:
     std::unique_ptr<RequestHandler> handler_;
     int                             client_sock_;
     bool                            done_;
+    std::shared_ptr<spdlog::logger> logger_;   // 日志器，由外部注入
 
     void send_response(int client_sock, const HttpResponse& resp)
     {
@@ -140,8 +141,7 @@ private:
             ssize_t sent = ::send(client_sock, data + total_sent, to_send - total_sent, 0);
             if (sent <= 0)
             {
-                if (g_logger)
-                    g_logger->error("send failed: {}", std::strerror(errno));
+                logger_->error("send failed: {}", std::strerror(errno));
                 return;
             }
             total_sent += sent;
