@@ -9,11 +9,11 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "../HttpBuilder.h"
-#include "../HttpHandlers.h"
-#include "../HttpParser.h"
-#include "../HttpRouter.h"
-#include "../Socket.h"
+#include "http/HttpBuilder.h"
+#include "http/handlers/HttpHandlers.h"
+#include "http/parser/HttpParser.h"
+#include "http/router/HttpRouter.h"
+#include "io/socket/Socket.h"
 
 /**
  * 带线程池的多线程服务器实现
@@ -25,7 +25,7 @@
 class Server
 {
 public:
-    Server(std::string address, int port, int pool_size = 4, std::string static_dir = "WEB_INF")
+    Server(std::string address, int port, int pool_size = 4, std::string static_dir = "web_root")
         : address_(std::move(address))
         , port_(port)
         , static_dir_(std::move(static_dir))

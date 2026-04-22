@@ -1,16 +1,18 @@
 #include <dirent.h>
 #include <iostream>
 #include <signal.h>
-#include <spdlog/sinks/basic_file_sink.h>
-#include <spdlog/spdlog.h>
 #include <stack>
 #include <vector>
 
-#include "../HttpBuilder.h"
-#include "../HttpHandlers.h"
-#include "../HttpParser.h"
-#include "../HttpRouter.h"
-#include "../Socket.h"
+// Third-party code
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/spdlog.h>
+
+#include "http/HttpBuilder.h"
+#include "http/handlers/HttpHandlers.h"
+#include "http/parser/HttpParser.h"
+#include "http/router/HttpRouter.h"
+#include "io/socket/Socket.h"
 
 /**
  * 简单的多线程服务器实现
@@ -22,7 +24,7 @@
 class Server
 {
 public:
-    Server(std::string address, int port, std::string static_dir = "WEB_INF")
+    Server(std::string address, int port, std::string static_dir = "web_root")
         : address_(std::move(address))
         , port_(port)
         , static_dir_(std::move(static_dir))

@@ -1,97 +1,106 @@
-CXX := g++
+CXX ?= g++
 
-# 通用编译选项
-COMMON_FLAGS := -std=c++11 -Wall -Wextra -Iinclude -pthread
-
-# 默认模式为 debug，可通过 make MODE=release 切换
+# ========== Build mode ==========
 MODE ?= debug
 
-# 根据模式设置特定选项和输出目录
-ifeq ($(MODE), release)
-    CXXFLAGS := $(COMMON_FLAGS) -O3 -DNDEBUG
-    BUILD_ROOT := build/release
+COMMON_FLAGS := -std=c++11 -Wall -Wextra -Ithird_party -Isrc -pthread
+
+ifeq ($(MODE),release)
+	CXXFLAGS := $(COMMON_FLAGS) -O3 -DNDEBUG
+	BUILD_ROOT := build/release
 else
-    # debug 模式：开启调试信息和地址检查
-    CXXFLAGS := $(COMMON_FLAGS) -g -O0 -fsanitize=address
-    BUILD_ROOT := build/debug
+	CXXFLAGS := $(COMMON_FLAGS) -g -O0 -fsanitize=address
+	BUILD_ROOT := build/debug
 endif
 
-# SRCS := Server.cpp
-# TARGET := $(BUILD_ROOT)/server
+# ========== Directories ==========
+SRC_DIR   := src
+APPS_DIR  := apps
+TEST_DIR  := tests
 
-BUILD_DIR := build
+# ========== Core library (src/) ==========
+# 当前 src 基本都是 header-only；这里预留对 .cc/.cpp 的支持，后续把实现拆到 .cc 时不用再改 Makefile
+CORE_SRCS := $(shell find $(SRC_DIR) -type f \( -name '*.cc' -o -name '*.cpp' \) 2>/dev/null)
+CORE_OBJS := \
+  $(patsubst %.cc,$(BUILD_ROOT)/obj/%.o,$(filter %.cc,$(CORE_SRCS))) \
+  $(patsubst %.cpp,$(BUILD_ROOT)/obj/%.o,$(filter %.cpp,$(CORE_SRCS)))
 
-# 简单Server的编译配置
-SIMPLE_DIR := simple_impl
-SIMPLE_SRCS := $(wildcard $(SIMPLE_DIR)/*.cpp)
-SIMPLE_BINS := $(patsubst $(SIMPLE_DIR)/%.cpp,$(BUILD_ROOT)/simple_impl/%,$(SIMPLE_SRCS))
+# ========== Apps ==========
+APP_SRCS := $(sort $(wildcard $(APPS_DIR)/*/*.cc) $(wildcard $(APPS_DIR)/*/*.cpp))
+APP_BINS := \
+  $(patsubst $(APPS_DIR)/%.cc,$(BUILD_ROOT)/apps/%,$(filter %.cc,$(APP_SRCS))) \
+  $(patsubst $(APPS_DIR)/%.cpp,$(BUILD_ROOT)/apps/%,$(filter %.cpp,$(APP_SRCS)))
 
-# 测试文件的编译配置
-TEST_DIR := tests
-TEST_SRCS := $(wildcard $(TEST_DIR)/*.cpp)
-TEST_BINS := $(patsubst $(TEST_DIR)/%.cpp,$(BUILD_ROOT)/tests/%,$(TEST_SRCS))
+# ========== Tests ==========
+TEST_SRCS_ALL := $(sort $(wildcard $(TEST_DIR)/*.cc) $(wildcard $(TEST_DIR)/*.cpp))
 
-.PHONY: all tests run-tests run-benchmark clean
+# http_parse_test.cc 依赖 experiments/Http.h 的旧实现；在你把测试迁到新 HTTP 栈前，先默认不编它
+TEST_SRCS := $(filter-out $(TEST_DIR)/http_parse_test.cc,$(TEST_SRCS_ALL))
 
-all: $(TARGET) tests simple_impl
+TEST_BINS := \
+  $(patsubst $(TEST_DIR)/%.cc,$(BUILD_ROOT)/tests/%,$(filter %.cc,$(TEST_SRCS))) \
+  $(patsubst $(TEST_DIR)/%.cpp,$(BUILD_ROOT)/tests/%,$(filter %.cpp,$(TEST_SRCS)))
 
-# 打印帮助信息
+# ========== Phony targets ==========
+.PHONY: all apps tests run-tests run-wrk run-benchmark clean help
+
+all: apps tests
+
 help:
 	@echo "Usage:"
-	@echo "  make [MODE=debug|release]    # Build main server (default: debug)"
-	@echo "  make tests [MODE=...]        # Build tests"
-	@echo "  make run-tests               # Run functional tests"
-	@echo "  make run-benchmark           # Run benchmark (recommend MODE=release)"
-	@echo "  make clean                   # Clean all builds"
+	@echo "  make [MODE=debug|release]  # build apps + tests (default: debug)"
+	@echo "  make apps [MODE=...]       # build all apps under apps/*/"
+	@echo "  make tests [MODE=...]      # build tests under tests/"
+	@echo "  make run-tests [MODE=...]  # run scripts/run_tests.sh"
+	@echo "  make run-wrk MODE=release  # run scripts/run_wrk.sh"
+	@echo "  make run-benchmark MODE=release # run scripts/run_benchmark.sh"
+	@echo "  make clean                 # remove build/<mode>"
 
-# ensure build directories exist
-$(BUILD_ROOT):
-	mkdir -p $(BUILD_ROOT)
-
-$(BUILD_ROOT)/simple_impl:
-	mkdir -p $(BUILD_ROOT)/simple_impl
-
-$(BUILD_ROOT)/tests:
-	mkdir -p $(BUILD_ROOT)/tests
-
-# 主程序的编译规则
-# $(TARGET): $(SRCS) | $(BUILD_ROOT)
-# 	$(CXX) $(CXXFLAGS) -o $@ $^
-
-# each test .cpp -> build/<mode>/tests/<name>
-$(BUILD_ROOT)/tests/%: $(TEST_DIR)/%.cpp | $(BUILD_ROOT)/tests
-	$(CXX) $(CXXFLAGS) -o $@ $<
-
-# simple_implementation -> build/<mode>/simple_impl/<name>
-$(BUILD_ROOT)/simple_impl/%: $(SIMPLE_DIR)/%.cpp | $(BUILD_ROOT)/simple_impl
-	$(CXX) $(CXXFLAGS) -o $@ $<
-
+apps: $(APP_BINS)
 tests: $(TEST_BINS)
 
-simple_impl: $(SIMPLE_BINS)
+# ========== Compile core objects ==========
+$(BUILD_ROOT)/obj/%.o: %.cc
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -MMD -MP -c -o $@ $<
 
-# 执行功能测试 (默认使用当前 MODE 构建的程序)
+$(BUILD_ROOT)/obj/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -MMD -MP -c -o $@ $<
+
+# ========== Link apps ==========
+$(BUILD_ROOT)/apps/%: $(APPS_DIR)/%.cc $(CORE_OBJS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -o $@ $< $(CORE_OBJS)
+
+$(BUILD_ROOT)/apps/%: $(APPS_DIR)/%.cpp $(CORE_OBJS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -o $@ $< $(CORE_OBJS)
+
+# ========== Link tests ==========
+$(BUILD_ROOT)/tests/%: $(TEST_DIR)/%.cc $(CORE_OBJS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -o $@ $< $(CORE_OBJS)
+
+$(BUILD_ROOT)/tests/%: $(TEST_DIR)/%.cpp $(CORE_OBJS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -o $@ $< $(CORE_OBJS)
+
+# ========== Run scripts ==========
 run-tests: tests
-	@echo "Running functional tests ($(MODE) mode)..."
-	@chmod +x ./tests/run_tests.sh
-	@# 传递构建目录给脚本，以便脚本知道去哪里找可执行文件
-	@./tests/run_tests.sh $(BUILD_ROOT)
+	@chmod +x ./scripts/run_tests.sh
+	@./scripts/run_tests.sh $(BUILD_ROOT)
 
-# 执行性能基准测试
-# run-benchmark: tests
-# 	@echo "Running benchmark tests ($(MODE) mode)..."
-# 	@if [ "$(MODE)" = "debug" ]; then \
-# 	    echo "WARNING: Running benchmark in DEBUG mode. Use 'make run-benchmark MODE=release' for accurate results."; \
-# 	fi
-# 	@chmod +x ./tests/run_benchmark.sh
-# 	@./tests/run_benchmark.sh $(BUILD_ROOT)
-run-wrk: simple_impl
-	@echo "Running wrk benchmark tests ($(MODE) mode)..."
-	@if [ "$(MODE)" = "debug" ]; then \
-	    echo "WARNING: Running benchmark in DEBUG mode. Use 'make run-wrk MODE=release' for accurate results."; \
-	fi
-	@chmod +x ./tests/run_wrk.sh
-	@./tests/run_wrk.sh $(BUILD_ROOT)
+run-wrk: apps
+	@chmod +x ./scripts/run_wrk.sh
+	@./scripts/run_wrk.sh $(BUILD_ROOT)
+
+run-benchmark: tests apps
+	@chmod +x ./scripts/run_benchmark.sh
+	@./scripts/run_benchmark.sh $(BUILD_ROOT)
 
 clean:
 	rm -rf $(BUILD_ROOT)
+
+# deps (only core objs generate .d right now)
+-include $(CORE_OBJS:.o=.d)

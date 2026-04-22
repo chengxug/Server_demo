@@ -13,16 +13,16 @@ fi
 
 # 3. 定义 Server 启动命令
 declare -A SERVERS=(
-  ["iterative"]="${BUILD_ROOT}/simple_impl/Iterative_server -p 7788"
-  ["multithread"]="${BUILD_ROOT}/simple_impl/multithread_server -p 7788"
-  ["threadpool"]="${BUILD_ROOT}/simple_impl/threadpool_server -p 7788 -t 8"
+  ["iterative"]="${BUILD_ROOT}/apps/00_iterative/Iterative_server -p 7788"
+  ["multithread"]="${BUILD_ROOT}/apps/01_multithread_per_conn/multithread_server -p 7788"
+  ["threadpool"]="${BUILD_ROOT}/apps/02_threadpool_blocking/threadpool_server -p 7788 -t 8"
+  ["iomux"]="${BUILD_ROOT}/apps/03_iomultiplexing/IO_multiplexing_server -p 7788"
 )
 # 定义测试顺序
 SERVER_ORDER=("iterative" "multithread" "threadpool")
 
 # 4. 测试参数配置
 # 并发连接数列表 (模拟不同负载场景)
-# 建议包含：低并发(1, 10), 中并发(100), 高并发(1000)
 # CONCURRENCY_LEVELS=(1 10 50 100 500 1000 2000)
 CONCURRENCY_LEVELS=(2000)
 

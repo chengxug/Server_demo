@@ -6,14 +6,15 @@
 #include <string>
 #include <sys/epoll.h>
 
-#include <../HttpBuilder.h>
-#include <../HttpHandlers.h>
-#include <../HttpRouter.h>
-#include <../Socket.h>
-
 // Third-party code
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/spdlog.h>
+
+#include "http/HttpBuilder.h"
+#include "http/handlers/HttpHandlers.h"
+#include "http/parser/HttpParser.h"
+#include "http/router/HttpRouter.h"
+#include "io/socket/Socket.h"
 
 /**
  * Http连接的抽象, 用于IO多路复用中管理连接状态
@@ -43,7 +44,7 @@ struct Connection
 class Server
 {
 public:
-    Server(std::string addr, int port, std::string static_dir = "WEB_INF")
+    Server(std::string addr, int port, std::string static_dir = "web_root")
         : address_(std::move(addr))
         , port_(port)
         , static_dir_(std::move(static_dir))
