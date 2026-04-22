@@ -1,4 +1,5 @@
 #pragma once
+#include <cstring>
 #include <memory>
 #include <spdlog/spdlog.h>
 #include <sys/socket.h>
@@ -25,7 +26,7 @@ public:
     void onRequestLine(const std::string& method, const std::string& path,
                        const std::string& version) override
     {
-        (void)version;   // 暂不使用 HTTP 版本
+        version_ = version;
         if (method == "GET")
             req_.method = HttpMethod::GET;
         else if (method == "POST")
@@ -100,14 +101,47 @@ public:
     // 提供给 Server 判断是否处理完一个请求
     bool isDone() const { return done_; }
 
-    // 重置状态（如果需要支持 Keep-Alive 复用同一个 Builder）
-    // void reset()
-    // {
-    //     done_ = false;
-    //     handler_.reset();
-    // }
+    // 重置状态（支持 Keep-Alive 复用同一个 Builder）
+    void reset()
+    {
+        done_ = false;
+        handler_.reset();
+        req_ = HttpRequest();
+        params_.clear();
+        version_.clear();
+    }
+
+    bool shouldKeepAlive() const
+    {
+        std::string connection_val = "";
+        for (const auto& header : req_.headers)
+        {
+            std::string key = header.first;
+            if (strcasecmp(key.c_str(), "Connection") == 0)
+            {
+                connection_val = header.second;
+                break;
+            }
+        }
+
+        if (!connection_val.empty())
+        {
+            if (connection_val == "close")
+                return false;
+            if (connection_val == "keep-alive")
+                return true;
+        }
+
+        // 如果没有 Connection 头，根据 HTTP 版本判断
+        if (version_ == "HTTP/1.0")
+            return false;
+
+        // HTTP/1.1 默认为 keep-alive
+        return true;
+    }
 
 private:
+    std::string                     version_;
     HttpRequest                     req_;
     Router&                         router_;
     RouteParams                     params_;

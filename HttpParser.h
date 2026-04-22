@@ -31,6 +31,7 @@ class HttpParser
 public:
     void        feed(const char* data, size_t len);              // 接收数据进行解析
     std::string errorMessage() const { return error_message; }   // 返回错误信息
+    void        reset();                                         // 重置解析器状态
     HttpParser(HttpParserCallback* callback);
 
 private:
@@ -62,6 +63,20 @@ private:
 HttpParser::HttpParser(HttpParserCallback* callback)
     : callback_(callback)
 {
+}
+
+void HttpParser::reset()
+{
+    state = ParserState::REQUEST_LINE;
+    contentLength = 0;
+    bodyBytesRead = 0;
+    method.clear();
+    uri.clear();
+    version.clear();
+    headers.clear();
+    error_message.clear();
+    error_code = 0;
+    // buffer 不清空，保留剩余数据供下一次解析
 }
 
 void HttpParser::feed(const char* data, size_t len)
